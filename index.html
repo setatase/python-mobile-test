@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PyPocket — Python Notebook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117; --surface: #181c27; --surface2: #1e2333;
+  --border: rgba(255,255,255,0.08); --border-hover: rgba(255,255,255,0.18);
+  --accent: #7c6fff; --accent2: #3ecfb2; --accent3: #f7c948;
+  --text: #e8eaf0; --text2: #8b90a0; --text3: #5a5f70;
+  --red: #ff6b6b; --green: #3ecfb2;
+  --mono: 'JetBrains Mono', monospace; --sans: 'Syne', sans-serif;
+  --r: 12px; --rs: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); overflow-x: hidden; }
+.header { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(15,17,23,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.logo { display: flex; align-items: center; gap: 8px; }
+.logo-icon { width: 28px; height: 28px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.logo-text { font-size: 17px; font-weight: 700; }
+.logo-text span { color: var(--accent); }
+.header-actions { display: flex; gap: 8px; }
+.btn-icon { width: 36px; height: 36px; border-radius: var(--rs); border: 1px solid var(--border); background: var(--surface); color: var(--text2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; touch-action: manipulation; }
+.btn-icon:active { transform: scale(0.93); }
+.runtime-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text2); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+.status-dot.loading { background: var(--accent3); animation: pulse 1s infinite; }
+.status-dot.ready { background: var(--green); }
+.status-dot.error { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+.runtime-version { margin-left: auto; font-family: var(--mono); font-size: 11px; }
+.notebook { padding: 12px 12px 160px; display: flex; flex-direction: column; gap: 10px; }
+.cell { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; transition: border-color 0.2s; }
+.cell.active { border-color: var(--accent); }
+.cell.running { border-color: var(--accent3); }
+.cell-header { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border); }
+.cell-num { font-family: var(--mono); font-size: 11px; color: var(--text3); min-width: 28px; }
+.cell-type-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(124,111,255,0.15); color: var(--accent); }
+.cell-actions { display: flex; gap: 4px; margin-left: auto; }
+.cell-btn { padding: 4px 8px; border-radius: 5px; border: none; background: transparent; color: var(--text3); font-size: 13px; cursor: pointer; touch-action: manipulation; }
+.cell-btn:active { background: var(--surface2); color: var(--text); }
+.run-btn { background: rgba(124,111,255,0.2) !important; color: var(--accent) !important; font-weight: 600; padding: 4px 12px !important; font-size: 12px !important; font-family: var(--sans) !important; }
+.run-btn:active { background: var(--accent) !important; color: white !important; }
+.run-btn.spin { background: rgba(247,201,72,0.2) !important; color: var(--accent3) !important; }
+.code-area { width: 100%; min-height: 70px; background: transparent; border: none; outline: none; resize: none; font-family: var(--mono); font-size: 13.5px; line-height: 1.6; color: var(--text); padding: 12px 14px; caret-color: var(--accent); -webkit-overflow-scrolling: touch; }
+.code-area::placeholder { color: var(--text3); }
+.code-area:focus { background: rgba(124,111,255,0.03); }
+.cell-output { border-top: 1px solid var(--border); padding: 10px 14px; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
+.out-stdout { color: var(--text); white-space: pre-wrap; word-break: break-all; }
+.out-err { color: var(--red); white-space: pre-wrap; word-break: break-all; }
+.out-result { color: var(--accent2); white-space: pre-wrap; word-break: break-all; border-top: 1px dashed var(--border); margin-top: 6px; padding-top: 6px; }
+.out-time { font-size: 10px; color: var(--text3); margin-top: 6px; }
+.add-cell-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border: 1px dashed var(--border); border-radius: var(--r); background: transparent; color: var(--text3); font-size: 13px; font-family: var(--sans); cursor: pointer; width: 100%; touch-action: manipulation; }
+.add-cell-btn:active { border-color: var(--accent); color: var(--accent); }
+
+/* ── SYMBOL BAR ── */
+.sym-bar { position: fixed; left: 0; right: 0; bottom: 68px; z-index: 150; background: rgba(11,13,20,0.98); backdrop-filter: blur(20px); border-top: 1px solid var(--border-hover); display: none; flex-direction: column; }
+.sym-bar.show { display: flex; }
+.sym-tabs { display: flex; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.sym-tabs::-webkit-scrollbar { display: none; }
+.sym-tab { padding: 8px 14px; font-size: 12px; font-weight: 600; color: var(--text3); border: none; background: transparent; cursor: pointer; white-space: nowrap; touch-action: manipulation; border-bottom: 2px solid transparent; flex-shrink: 0; }
+.sym-tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.sym-keys { display: flex; gap: 5px; padding: 7px 10px; overflow-x: auto; scrollbar-width: none; min-height: 54px; align-items: center; }
+.sym-keys::-webkit-scrollbar { display: none; }
+.sk { flex-shrink: 0; min-width: 40px; height: 40px; padding: 0 9px; background: var(--surface2); border: 1px solid var(--border-hover); border-radius: 7px; color: var(--text); font-family: var(--mono); font-size: 15px; cursor: pointer; touch-action: manipulation; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; }
+.sk:active { background: var(--accent); border-color: var(--accent); color: white; transform: scale(0.89); }
+.sk.lbl { font-size: 11px; font-family: var(--sans); color: var(--text2); min-width: 48px; }
+.sk.snip { min-width: auto; padding: 0 11px; background: rgba(124,111,255,0.13); border-color: rgba(124,111,255,0.38); color: var(--accent); font-family: var(--sans); font-size: 12px; font-weight: 600; }
+.sk.snip:active { background: var(--accent); color: white; }
+.sk.del { background: rgba(255,107,107,0.1); border-color: rgba(255,107,107,0.3); color: var(--red); }
+.sk.del:active { background: var(--red); color: white; }
+
+/* ── AUTOCOMPLETE ── */
+.ac { position: fixed; z-index: 400; background: var(--surface2); border: 1px solid var(--border-hover); border-radius: var(--rs); overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.65); min-width: 220px; max-width: calc(100vw - 24px); max-height: 210px; overflow-y: auto; display: none; }
+.ac.open { display: block; }
+.ac-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; touch-action: manipulation; border-bottom: 1px solid var(--border); }
+.ac-row:last-child { border-bottom: none; }
+.ac-row:active, .ac-row.sel { background: rgba(124,111,255,0.18); }
+.ac-kw { font-family: var(--mono); font-size: 13px; color: var(--accent); min-width: 80px; }
+.ac-lbl { font-size: 11px; color: var(--text2); flex: 1; }
+.ac-hint { font-size: 10px; color: var(--text3); background: var(--surface); border: 1px solid var(--border); padding: 1px 5px; border-radius: 3px; }
+
+/* ── FAB ── */
+.fab { position: fixed; bottom: 0; left: 0; right: 0; padding: 10px 16px env(safe-area-inset-bottom); background: rgba(15,17,23,0.97); backdrop-filter: blur(16px); border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: center; }
+.fab-run { flex: 1; padding: 13px; background: var(--accent); color: white; border: none; border-radius: var(--rs); font-family: var(--sans); font-size: 14px; font-weight: 600; cursor: pointer; touch-action: manipulation; }
+.fab-run:active { transform: scale(0.97); background: #6458e0; }
+.fab-run:disabled { background: var(--surface2); color: var(--text3); }
+
+/* ── AI PANEL ── */
+.ai-panel { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); display: none; align-items: flex-end; }
+.ai-panel.open { display: flex; }
+.ai-sheet { width: 100%; max-height: 85vh; background: var(--surface); border-radius: 20px 20px 0 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; animation: sup 0.28s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes sup { from{transform:translateY(100%)}to{transform:translateY(0)} }
+.ai-hdr { padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.ai-title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.ai-badge { background: linear-gradient(135deg,var(--accent),var(--accent2)); width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+.ai-x { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+.ai-ctx { padding: 10px 16px; background: rgba(124,111,255,0.06); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text2); }
+.ai-ctx-code { font-family: var(--mono); font-size: 11px; color: var(--accent); background: rgba(124,111,255,0.1); padding: 4px 8px; border-radius: 5px; margin-top: 4px; white-space: pre-wrap; word-break: break-all; max-height: 60px; overflow: hidden; }
+.ai-chips { display: flex; gap: 6px; padding: 10px 16px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.chip { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); font-size: 12px; cursor: pointer; touch-action: manipulation; }
+.chip:active { border-color: var(--accent); color: var(--accent); }
+.ai-msgs { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.amsg { padding: 10px 13px; border-radius: 12px; font-size: 13.5px; line-height: 1.6; max-width: 92%; }
+.amsg.u { background: var(--accent); color: white; align-self: flex-end; border-radius: 12px 12px 4px 12px; }
+.amsg.a { background: var(--surface2); color: var(--text); align-self: flex-start; border-radius: 12px 12px 12px 4px; }
+.amsg.a pre { font-family: var(--mono); font-size: 12px; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; margin-top: 6px; white-space: pre-wrap; }
+.ins-btn { display: inline-block; margin-top: 8px; padding: 6px 12px; background: rgba(62,207,178,0.15); color: var(--accent2); border: 1px solid rgba(62,207,178,0.3); border-radius: 6px; font-size: 12px; cursor: pointer; font-family: var(--sans); font-weight: 600; }
+.ai-in-row { display: flex; gap: 8px; padding: 12px 16px env(safe-area-inset-bottom); border-top: 1px solid var(--border); }
+.ai-in { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--rs); color: var(--text); font-family: var(--sans); font-size: 14px; padding: 10px 14px; outline: none; resize: none; min-height: 44px; max-height: 120px; }
+.ai-in:focus { border-color: var(--accent); }
+.ai-send { width: 44px; height: 44px; border-radius: var(--rs); background: var(--accent); border: none; color: white; font-size: 18px; cursor: pointer; touch-action: manipulation; flex-shrink: 0; }
+.ai-send:active { background: #6458e0; }
+.thinking { display: flex; align-items: center; padding: 10px 13px; background: var(--surface2); border-radius: 12px; align-self: flex-start; }
+.dw span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; animation: wave 1.2s infinite; margin: 0 2px; }
+.dw span:nth-child(2){animation-delay:.2s}.dw span:nth-child(3){animation-delay:.4s}
+@keyframes wave{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+/* ── HISTORY ── */
+.hist-panel { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); display: none; }
+.hist-panel.open { display: block; }
+.hist-sheet { position: absolute; top: 0; right: 0; bottom: 0; width: min(320px,100vw); background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; animation: sl 0.25s ease; }
+@keyframes sl{from{transform:translateX(100%)}to{transform:translateX(0)}}
+.hist-hdr { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.hist-hdr-title { font-size: 15px; font-weight: 700; }
+.hist-list { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.hist-item { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--rs); padding: 10px 12px; cursor: pointer; }
+.hist-item:active { border-color: var(--accent); }
+.hist-code { font-family: var(--mono); font-size: 11px; color: var(--text2); white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.hist-meta { font-size: 11px; color: var(--text3); margin-top: 4px; display: flex; justify-content: space-between; }
+.hist-empty { text-align: center; color: var(--text3); font-size: 13px; padding: 40px 20px; }
+
+.toast { position: fixed; bottom: 130px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface2); color: var(--text); padding: 10px 20px; border-radius: 100px; font-size: 13px; border: 1px solid var(--border); opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 300; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border-hover);border-radius:10px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🐍</div>
+    <div class="logo-text">Py<span>Pocket</span></div>
+  </div>
+  <div class="header-actions">
+    <button class="btn-icon" onclick="openHistory()">📋</button>
+    <button class="btn-icon" onclick="clearAll()">🗑</button>
+  </div>
+</div>
+
+<div class="runtime-bar">
+  <div class="status-dot loading" id="statusDot"></div>
+  <span id="statusText">Pythonランタイムを起動中...</span>
+  <span class="runtime-version" id="runtimeVersion"></span>
+</div>
+
+<div class="notebook" id="notebook"></div>
+
+<!-- SYMBOL BAR -->
+<div class="sym-bar" id="symBar">
+  <div class="sym-tabs">
+    <button class="sym-tab on" onclick="switchTab(this,'symbols')">記号</button>
+    <button class="sym-tab" onclick="switchTab(this,'ops')">演算子</button>
+    <button class="sym-tab" onclick="switchTab(this,'strings')">文字列</button>
+    <button class="sym-tab" onclick="switchTab(this,'snippets')">スニペット</button>
+    <button class="sym-tab" onclick="switchTab(this,'nav')">操作</button>
+  </div>
+  <div class="sym-keys" id="symKeys"></div>
+</div>
+
+<!-- AUTOCOMPLETE -->
+<div class="ac" id="acPopup"></div>
+
+<!-- FAB -->
+<div class="fab">
+  <button class="fab-run" id="runAllBtn" onclick="runAll()" disabled>▶ 全セル実行</button>
+  <button class="btn-icon" style="width:48px;height:48px;flex-shrink:0" onclick="addCell()">＋</button>
+  <button class="btn-icon" style="width:48px;height:48px;flex-shrink:0;background:rgba(124,111,255,0.15);border-color:var(--accent);color:var(--accent)" onclick="openAI()">✨</button>
+</div>
+
+<!-- AI PANEL -->
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-sheet">
+    <div class="ai-hdr">
+      <div class="ai-title"><div class="ai-badge">✨</div>AI コード支援</div>
+      <button class="ai-x" onclick="closeAI()">✕</button>
+    </div>
+    <div class="ai-ctx">
+      <span>アクティブセルのコード：</span>
+      <div class="ai-ctx-code" id="aiCtxCode">（セルを選択してください）</div>
+    </div>
+    <div class="ai-chips">
+      <div class="chip" onclick="qp('このコードを説明して')">説明して</div>
+      <div class="chip" onclick="qp('このコードを最適化して')">最適化</div>
+      <div class="chip" onclick="qp('バグを修正して')">バグ修正</div>
+      <div class="chip" onclick="qp('コメントを追加して')">コメント追加</div>
+      <div class="chip" onclick="qp('テストコードを書いて')">テスト作成</div>
+    </div>
+    <div class="ai-msgs" id="aiMsgs"></div>
+    <div class="ai-in-row">
+      <textarea class="ai-in" id="aiIn" placeholder="AIに質問する..." rows="1" onkeydown="aiKD(event)"></textarea>
+      <button class="ai-send" onclick="sendAI()">↑</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="hist-panel" id="histPanel" onclick="closeHist(event)">
+  <div class="hist-sheet" onclick="event.stopPropagation()">
+    <div class="hist-hdr">
+      <div class="hist-hdr-title">📋 実行履歴</div>
+      <button class="ai-x" onclick="closeHist()">✕</button>
+    </div>
+    <div class="hist-list" id="histList"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
+<script>
+// ── STATE ─────────────────────────────────────
+let pyodide=null, cells=[], cellCtr=0, execOrder=0;
+let activeCellId=null, focusedTA=null;
+let aiConv=[], aiCtxCode='';
+let acResults=[], acIdx=-1, acTimer=null;
+let curTab='symbols';
+let execHistory = JSON.parse(localStorage.getItem('pp_hist')||'[]');
+
+// ── SYMBOL DATA ───────────────────────────────
+const TABS = {
+  symbols:[
+    {k:':',t:':'},{k:'.',t:'.'},{k:',',t:','},{k:'()',t:'()',c:1},{k:'[]',t:'[]',c:1},
+    {k:'{}',t:'{}',c:1},{k:"''",t:"''",c:1},{k:'""',t:'""',c:1},{k:'#',t:'# '},
+    {k:'_',t:'_'},{k:'__',t:'__'},{k:'@',t:'@'},{k:'\\',t:'\\'},
+    {k:'->',t:'->'},{k:'=>',t:'=>'},{k:'**',t:'**'},{k:'//',t:'//'},
+  ],
+  ops:[
+    {k:'==',t:'=='},{k:'!=',t:'!='},{k:'<=',t:'<='},{k:'>=',t:'>='},
+    {k:'<',t:'<'},{k:'>',t:'>'},
+    {k:'and',t:' and ',cls:'lbl'},{k:'or',t:' or ',cls:'lbl'},{k:'not',t:'not ',cls:'lbl'},
+    {k:'in',t:' in ',cls:'lbl'},{k:'is',t:' is ',cls:'lbl'},{k:'is not',t:' is not ',cls:'lbl'},
+    {k:'+=',t:'+='},{k:'-=',t:'-='},{k:'*=',t:'*='},{k:'/=',t:'/='},
+    {k:'%',t:'%'},{k:'|',t:'|'},{k:'&',t:'&'},{k:'^',t:'^'},
+  ],
+  strings:[
+    {k:"f''",t:"f''",c:2},{k:'f""',t:'f""',c:2},{k:"r''",t:"r''",c:2},{k:"b''",t:"b''",c:2},
+    {k:"'''…'''",t:"'''\n\n'''",c:4},{k:'"""…"""',t:'"""\n\n"""',c:4,cls:'lbl'},
+    {k:'{}',t:'{}',c:1},{k:'\\n',t:'\\n'},{k:'\\t',t:'\\t'},
+    {k:'%s',t:'%s'},{k:'%d',t:'%d'},{k:'%f',t:'%f'},
+  ],
+  snippets:[
+    {k:'for i',t:'for i in range():\n    ',c:13,cls:'snip'},
+    {k:'for x in',t:'for x in :\n    ',c:9,cls:'snip'},
+    {k:'while',t:'while :\n    ',c:6,cls:'snip'},
+    {k:'if',t:'if :\n    ',c:3,cls:'snip'},
+    {k:'if/else',t:'if :\n    pass\nelse:\n    pass',c:3,cls:'snip'},
+    {k:'def',t:'def ():\n    ',c:4,cls:'snip'},
+    {k:'class',t:'class ():\n    def __init__(self):\n        ',c:6,cls:'snip'},
+    {k:'try/except',t:'try:\n    \nexcept Exception as e:\n    print(e)',c:9,cls:'snip'},
+    {k:'with open',t:"with open('', 'r') as f:\n    data = f.read()",c:11,cls:'snip'},
+    {k:'list comp',t:'[ for x in ]',c:1,cls:'snip'},
+    {k:'dict comp',t:'{k: v for k,v in .items()}',c:1,cls:'snip'},
+    {k:'lambda',t:'lambda x: x',c:7,cls:'snip'},
+    {k:'import',t:'import ',cls:'snip'},
+    {k:'from…import',t:'from  import ',c:5,cls:'snip'},
+    {k:'print()',t:'print()',c:6,cls:'snip'},
+    {k:'enumerate',t:'for i, x in enumerate():\n    ',c:21,cls:'snip'},
+    {k:'zip',t:'for a,b in zip(,):\n    ',c:15,cls:'snip'},
+    {k:'main',t:'if __name__=="__main__":\n    ',c:0,cls:'snip'},
+  ],
+  nav:[
+    {k:'⌫',nav:'bs',cls:'del'},{k:'⇥',t:'    ',cls:'lbl'},{k:'↵',t:'\n'},
+    {k:'◀',nav:'L'},{k:'▶',nav:'R'},{k:'▲',nav:'U'},{k:'▼',nav:'D'},
+    {k:'Home',nav:'home',cls:'lbl'},{k:'End',nav:'end',cls:'lbl'},
+    {k:'全選択',nav:'all',cls:'lbl'},{k:'行削除',nav:'dl',cls:'lbl del'},
+  ]
+};
+
+// ── AUTOCOMPLETE DATA ─────────────────────────
+const AC_DATA = [
+  {tr:'for',lb:'for i in range()',ins:'for i in range():\n    ',c:13},
+  {tr:'forx',lb:'for x in リスト',ins:'for x in :\n    ',c:9},
+  {tr:'wh',lb:'while ループ',ins:'while :\n    ',c:6},
+  {tr:'if',lb:'if 条件文',ins:'if :\n    ',c:3},
+  {tr:'ife',lb:'if / else',ins:'if :\n    pass\nelse:\n    pass',c:3},
+  {tr:'def',lb:'関数定義 def()',ins:'def ():\n    ',c:4},
+  {tr:'cl',lb:'クラス定義',ins:'class ():\n    def __init__(self):\n        ',c:6},
+  {tr:'try',lb:'try / except',ins:'try:\n    \nexcept Exception as e:\n    print(e)',c:9},
+  {tr:'im',lb:'import モジュール',ins:'import ',c:7},
+  {tr:'fr',lb:'from … import',ins:'from  import ',c:5},
+  {tr:'pr',lb:'print()',ins:'print()',c:6},
+  {tr:'prf',lb:'print(f"...")',ins:'print(f"")',c:9},
+  {tr:'ret',lb:'return 値',ins:'return ',c:7},
+  {tr:'lam',lb:'lambda 式',ins:'lambda x: x',c:7},
+  {tr:'lc',lb:'リスト内包表記',ins:'[ for x in ]',c:1},
+  {tr:'dc',lb:'辞書内包表記',ins:'{k: v for k,v in .items()}',c:1},
+  {tr:'wo',lb:'with open()',ins:"with open('','r') as f:\n    data=f.read()",c:11},
+  {tr:'main',lb:'if __name__==__main__',ins:'if __name__=="__main__":\n    ',c:0},
+  {tr:'np',lb:'import numpy as np',ins:'import numpy as np\n',c:19},
+  {tr:'pd',lb:'import pandas as pd',ins:'import pandas as pd\n',c:20},
+  {tr:'plt',lb:'import matplotlib.pyplot',ins:'import matplotlib.pyplot as plt\n',c:32},
+  {tr:'en',lb:'enumerate()',ins:'for i,x in enumerate():\n    ',c:21},
+  {tr:'zi',lb:'zip()',ins:'for a,b in zip(,):\n    ',c:15},
+  {tr:'ran',lb:'range(n)',ins:'range()',c:6},
+  {tr:'len',lb:'len(obj)',ins:'len()',c:4},
+  {tr:'sor',lb:'sorted()',ins:'sorted()',c:7},
+  {tr:'map',lb:'map(func, list)',ins:'list(map(lambda x: x, ))',c:22},
+  {tr:'filt',lb:'filter()',ins:'list(filter(lambda x: x, ))',c:25},
+];
+
+// ── PYODIDE ───────────────────────────────────
+async function initPyodide(){
+  try{
+    pyodide=await loadPyodide();
+    await pyodide.loadPackagesFromImports('import sys,io,traceback,json');
+    document.getElementById('statusDot').className='status-dot ready';
+    document.getElementById('statusText').textContent='実行可能';
+    document.getElementById('runtimeVersion').textContent=`Python ${pyodide.version??'3.11'}`;
+    document.getElementById('runAllBtn').disabled=false;
+    showToast('🐍 Python準備完了！');
+    pyodide.runPython('import sys,io\nclass C(io.StringIO):pass\nsys.stdout=C()\nsys.stderr=C()');
+  }catch(e){
+    document.getElementById('statusDot').className='status-dot error';
+    document.getElementById('statusText').textContent='エラー: '+e.message;
+  }
+}
+
+// ── CELLS ─────────────────────────────────────
+function createCell(code=''){
+  const id=++cellCtr;
+  cells.push({id,code});
+  const nb=document.getElementById('notebook');
+  const el=document.createElement('div');
+  el.className='cell'; el.id=`cell-${id}`;
+  el.innerHTML=`
+    <div class="cell-header">
+      <span class="cell-num" id="cn-${id}">[  ]</span>
+      <span class="cell-type-badge">Python</span>
+      <div class="cell-actions">
+        <button class="cell-btn" onclick="openAIFor(${id})">✨</button>
+        <button class="cell-btn" onclick="mvCell(${id},-1)">↑</button>
+        <button class="cell-btn" onclick="mvCell(${id},1)">↓</button>
+        <button class="cell-btn" onclick="delCell(${id})">✕</button>
+        <button class="cell-btn run-btn" id="rb-${id}" onclick="runCell(${id})">▶ 実行</button>
+      </div>
+    </div>
+    <textarea class="code-area" id="ta-${id}" placeholder="# Pythonコードを入力..."
+      oninput="onInput(event,${id})" onfocus="onFocus(${id})" onblur="onBlur()"
+      onkeydown="onKD(event,${id})"></textarea>
+    <div class="cell-output" id="out-${id}" style="display:none"></div>`;
+  nb.insertBefore(el, nb.querySelector('.acbw'));
+  const ta=el.querySelector('textarea');
+  ta.value=code; ar(ta);
+}
+
+function onInput(e,id){ const ta=e.target; cells.find(c=>c.id===id).code=ta.value; ar(ta); triggerAC(ta); }
+function onFocus(id){
+  activeCellId=id; focusedTA=document.getElementById(`ta-${id}`);
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('active'));
+  document.getElementById(`cell-${id}`)?.classList.add('active');
+  document.getElementById('symBar').classList.add('show');
+  renderTab(curTab);
+}
+function onBlur(){
+  setTimeout(()=>{
+    const ae=document.activeElement;
+    if(ae&&(ae.classList.contains('code-area')||ae.closest('#symBar')||ae.closest('#acPopup')))return;
+    document.getElementById('symBar').classList.remove('show');
+    closeAC();
+  },200);
+}
+function onKD(e,id){
+  const ta=e.target;
+  if(e.key==='Tab'){e.preventDefault();if(acResults.length){applyAC(acIdx>=0?acIdx:0);return;}ins(ta,'    ');}
+  if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();runCell(id);}
+  if(e.key==='Escape')closeAC();
+  if(e.key==='ArrowDown'&&acResults.length){e.preventDefault();acIdx=Math.min(acIdx+1,acResults.length-1);renderAC();}
+  if(e.key==='ArrowUp'&&acResults.length){e.preventDefault();acIdx=Math.max(acIdx-1,0);renderAC();}
+  if(e.key==='Enter'&&acResults.length&&acIdx>=0){e.preventDefault();applyAC(acIdx);}
+}
+function ar(ta){ta.style.height='auto';ta.style.height=Math.max(70,ta.scrollHeight)+'px';}
+
+function delCell(id){
+  if(cells.length<=1){showToast('最後のセルは削除できません');return;}
+  cells=cells.filter(c=>c.id!==id);
+  document.getElementById(`cell-${id}`)?.remove();
+  showToast('セルを削除しました');
+}
+function mvCell(id,d){
+  const i=cells.findIndex(c=>c.id===id),ni=i+d;
+  if(ni<0||ni>=cells.length)return;
+  [cells[i],cells[ni]]=[cells[ni],cells[i]];
+  const nb=document.getElementById('notebook'),w=nb.querySelector('.acbw');
+  cells.forEach(c=>nb.insertBefore(document.getElementById(`cell-${c.id}`),w));
+}
+function addCell(code=''){
+  createCell(code);
+  setTimeout(()=>document.getElementById(`ta-${cells[cells.length-1].id}`)?.focus(),50);
+}
+function clearAll(){
+  if(!confirm('全セルをクリアしますか？'))return;
+  cells=[];cellCtr=0;
+  document.getElementById('notebook').innerHTML='<div class="acbw"></div>';
+  renderAddBtn(); createCell();
+  showToast('クリアしました');
+}
+function renderAddBtn(){
+  let w=document.querySelector('#notebook .acbw');
+  if(!w){w=document.createElement('div');w.className='acbw';document.getElementById('notebook').appendChild(w);}
+  w.innerHTML='<button class="add-cell-btn" onclick="addCell()">＋ セルを追加</button>';
+}
+
+// ── SYMBOL BAR ────────────────────────────────
+function switchTab(btn,tab){
+  curTab=tab;
+  document.querySelectorAll('.sym-tab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  renderTab(tab);
+  if(focusedTA)focusedTA.focus();
+}
+function renderTab(tab){
+  const items=TABS[tab]||[];
+  document.getElementById('symKeys').innerHTML=items.map(it=>{
+    const cls='sk'+(it.cls?' '+it.cls:'');
+    return `<button class="${cls}" ontouchstart="" onclick="tapKey(${JSON.stringify(it).replace(/"/g,'&quot;')})">${esc(it.k)}</button>`;
+  }).join('');
+}
+function tapKey(it){
+  const ta=focusedTA; if(!ta)return;
+  if(it.nav){navAct(ta,it.nav);return;}
+  ins(ta,it.t,it.c);
+  const cell=cells.find(c=>`ta-${c.id}`===ta.id);
+  if(cell)cell.code=ta.value;
+  ar(ta); ta.focus();
+}
+function navAct(ta,a){
+  ta.focus();
+  const s=ta.selectionStart,e2=ta.selectionEnd,v=ta.value;
+  if(a==='bs'){
+    if(s!==e2){ins(ta,'');}
+    else if(s>0){ta.value=v.slice(0,s-1)+v.slice(s);ta.selectionStart=ta.selectionEnd=s-1;ta.dispatchEvent(new Event('input',{bubbles:true}));}
+  }else if(a==='L'){ta.selectionStart=ta.selectionEnd=Math.max(0,s-1);}
+  else if(a==='R'){ta.selectionStart=ta.selectionEnd=Math.min(v.length,s+1);}
+  else if(a==='home'){ta.selectionStart=ta.selectionEnd=v.lastIndexOf('\n',s-1)+1;}
+  else if(a==='end'){const n=v.indexOf('\n',s);ta.selectionStart=ta.selectionEnd=n<0?v.length:n;}
+  else if(a==='all'){ta.select();}
+  else if(a==='U'){
+    const ls=v.lastIndexOf('\n',s-1)+1,col=s-ls,pe=ls-1;
+    if(pe<0)return;
+    const ps=v.lastIndexOf('\n',pe-1)+1;
+    ta.selectionStart=ta.selectionEnd=Math.min(ps+col,pe);
+  }else if(a==='D'){
+    const le=v.indexOf('\n',s);if(le<0)return;
+    const col=s-(v.lastIndexOf('\n',s-1)+1),ne=v.indexOf('\n',le+1);
+    const t2=le+1+col;ta.selectionStart=ta.selectionEnd=ne<0?Math.min(t2,v.length):Math.min(t2,ne);
+  }else if(a==='dl'){
+    const ls=v.lastIndexOf('\n',s-1)+1,le=v.indexOf('\n',s);
+    ta.value=v.slice(0,ls)+(le<0?'':v.slice(le+1));
+    ta.selectionStart=ta.selectionEnd=ls;
+    ta.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+}
+function ins(ta,text,curBack){
+  const s=ta.selectionStart,e=ta.selectionEnd;
+  ta.value=ta.value.slice(0,s)+text+ta.value.slice(e);
+  const np=curBack!==undefined?s+curBack:s+text.length;
+  ta.selectionStart=ta.selectionEnd=np;
+  ta.dispatchEvent(new Event('input',{bubbles:true}));
+}
+
+// ── AUTOCOMPLETE ──────────────────────────────
+function triggerAC(ta){
+  clearTimeout(acTimer);
+  acTimer=setTimeout(()=>{
+    const s=ta.selectionStart,text=ta.value.slice(0,s);
+    const word=text.match(/(\w+)$/)?.[1]||'';
+    if(word.length<2){closeAC();return;}
+    const m=AC_DATA.filter(x=>x.tr.startsWith(word.toLowerCase())&&x.tr!==word.toLowerCase());
+    if(!m.length){closeAC();return;}
+    acResults=m; acIdx=-1;
+    posAC(ta);
+  },100);
+}
+function posAC(ta){
+  const popup=document.getElementById('acPopup');
+  const r=ta.getBoundingClientRect();
+  const ph=Math.min(210,acResults.length*44);
+  if(window.innerHeight-r.bottom>ph+10){popup.style.top=(r.bottom+4)+'px';popup.style.bottom='auto';}
+  else{popup.style.bottom=(window.innerHeight-r.top+4)+'px';popup.style.top='auto';}
+  popup.style.left=(r.left+10)+'px';
+  renderAC(); popup.classList.add('open');
+}
+function renderAC(){
+  document.getElementById('acPopup').innerHTML=acResults.map((sn,i)=>`
+    <div class="ac-row${i===acIdx?' sel':''}" ontouchstart="" onclick="applyAC(${i})">
+      <span class="ac-kw">${esc(sn.tr)}</span>
+      <span class="ac-lbl">${esc(sn.lb)}</span>
+      <span class="ac-hint">Tab</span>
+    </div>`).join('');
+}
+function applyAC(idx){
+  const sn=acResults[idx]; if(!sn||!focusedTA){closeAC();return;}
+  const ta=focusedTA,s=ta.selectionStart,text=ta.value.slice(0,s);
+  const word=text.match(/(\w+)$/)?.[1]||'';
+  const start=s-word.length;
+  ta.value=ta.value.slice(0,start)+sn.ins+ta.value.slice(s);
+  ta.selectionStart=ta.selectionEnd=start+(sn.c??sn.ins.length);
+  const cell=cells.find(c=>`ta-${c.id}`===ta.id);
+  if(cell)cell.code=ta.value;
+  ar(ta); ta.focus(); closeAC();
+  showToast('✓ '+sn.lb);
+}
+function closeAC(){ acResults=[];acIdx=-1;document.getElementById('acPopup').classList.remove('open'); }
+document.addEventListener('touchstart',e=>{if(!e.target.closest('#acPopup')&&!e.target.closest('.code-area'))closeAC();},{passive:true});
+
+// ── EXECUTION ─────────────────────────────────
+async function runCell(id){
+  if(!pyodide){showToast('ランタイム起動中...');return;}
+  const cell=cells.find(c=>c.id===id);
+  if(!cell||!cell.code.trim())return;
+  const rb=document.getElementById(`rb-${id}`),cel=document.getElementById(`cell-${id}`);
+  rb.textContent='⏳';rb.classList.add('spin');cel.classList.add('running');cel.classList.remove('active');
+  const t0=performance.now();
+  let stdout='',result='',err='';
+  try{
+    pyodide.runPython('sys.stdout.truncate(0);sys.stdout.seek(0);sys.stderr.truncate(0);sys.stderr.seek(0)');
+    let res;
+    try{res=await pyodide.runPythonAsync(cell.code);}catch(e){err=e.message||String(e);}
+    stdout=pyodide.runPython('sys.stdout.getvalue()');
+    const se=pyodide.runPython('sys.stderr.getvalue()');
+    if(se&&!err)err=se;
+    if(res!==undefined&&res!==null&&String(res)!=='undefined')result=String(res);
+  }catch(e){err=e.message||String(e);}
+  const el=((performance.now()-t0)/1000).toFixed(3);
+  cell.execCount=++execOrder;
+  document.getElementById(`cn-${id}`).textContent=`[${cell.execCount}]`;
+  const out=document.getElementById(`out-${id}`);
+  let html='';
+  if(stdout)html+=`<div class="out-stdout">${esc(stdout)}</div>`;
+  if(err)html+=`<div class="out-err">⚠ ${esc(err)}</div>`;
+  if(result&&!err)html+=`<div class="out-result">${esc(result)}</div>`;
+  if(!html)html='<div class="out-time">✓ 実行完了</div>';
+  html+=`<div class="out-time">⏱ ${el}s</div>`;
+  out.innerHTML=html;out.style.display='';
+  rb.textContent='▶ 実行';rb.classList.remove('spin');cel.classList.remove('running');
+  const entry={code:cell.code.substring(0,120),time:new Date().toLocaleTimeString('ja-JP'),elapsed:el,error:!!err};
+  execHistory.unshift(entry);if(execHistory.length>50)execHistory.pop();
+  localStorage.setItem('pp_hist',JSON.stringify(execHistory));
+}
+async function runAll(){for(const c of cells)await runCell(c.id);showToast('✓ 全セル実行完了');}
+
+// ── HISTORY ───────────────────────────────────
+function openHistory(){
+  document.getElementById('histList').innerHTML=!execHistory.length
+    ?'<div class="hist-empty">まだ実行履歴がありません</div>'
+    :execHistory.map((h,i)=>`
+      <div class="hist-item" onclick="insertHist(${i})">
+        <div class="hist-code">${esc(h.code.substring(0,80))}${h.code.length>80?'…':''}</div>
+        <div class="hist-meta"><span>${h.time}</span><span style="color:${h.error?'var(--red)':'var(--green)'}">${h.error?'✗ エラー':'✓ 成功'} ${h.elapsed}s</span></div>
+      </div>`).join('');
+  document.getElementById('histPanel').classList.add('open');
+}
+function closeHist(e){if(!e||e.target===document.getElementById('histPanel'))document.getElementById('histPanel').classList.remove('open');}
+function insertHist(i){addCell(execHistory[i].code);closeHist();showToast('コードを挿入しました');}
+
+// ── AI ────────────────────────────────────────
+function openAI(){
+  const code=activeCellId?(cells.find(c=>c.id===activeCellId)?.code||''):'';
+  aiCtxCode=code;
+  document.getElementById('aiCtxCode').textContent=code.substring(0,100)||'（セルを選択してください）';
+  document.getElementById('aiPanel').classList.add('open');
+  document.getElementById('aiIn').focus();
+}
+function openAIFor(id){activeCellId=id;openAI();}
+function closeAI(){document.getElementById('aiPanel').classList.remove('open');}
+function aiKD(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAI();}}
+function qp(msg){document.getElementById('aiIn').value=msg;sendAI();}
+
+async function sendAI(){
+  const inp=document.getElementById('aiIn'),msg=inp.value.trim();
+  if(!msg)return; inp.value='';
+  const um=aiCtxCode?`セルのコード:\n\`\`\`python\n${aiCtxCode}\n\`\`\`\n\n${msg}`:msg;
+  aiConv.push({role:'user',content:um});
+  appendMsg('u',msg);
+  const th=appendThink();
+  document.getElementById('aiMsgs').scrollTop=99999;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,
+        system:'あなたはPythonの専門家です。スマホ向けノートブックアプリでサポート。コードブロックは```python...```で囲む。日本語で簡潔に回答。',
+        messages:aiConv})
+    });
+    const data=await res.json(); th.remove();
+    const reply=data.content?.map(b=>b.text||'').join('')||'エラーが発生しました';
+    aiConv.push({role:'assistant',content:reply});
+    appendMsg('a',reply);
+  }catch(e){th.remove();appendMsg('a','エラー: '+e.message);}
+  document.getElementById('aiMsgs').scrollTop=99999;
+}
+function appendMsg(role,text){
+  const msgs=document.getElementById('aiMsgs'),div=document.createElement('div');
+  div.className='amsg '+role;
+  if(role==='a'){
+    const blocks=[];
+    let html=esc(text).replace(/```python\n?([\s\S]*?)```/g,(_,c)=>{blocks.push(c);return`__B${blocks.length-1}__`;});
+    html=html.replace(/__B(\d+)__/g,(_,i)=>{const c=blocks[+i];return`<pre>${esc(c)}</pre><button class="ins-btn" onclick="insCode('${escA(c)}')">↓ セルに挿入</button>`;});
+    div.innerHTML=html.replace(/\n/g,'<br>');
+  }else{div.textContent=text;}
+  msgs.appendChild(div);return div;
+}
+function appendThink(){
+  const msgs=document.getElementById('aiMsgs'),div=document.createElement('div');
+  div.className='thinking';div.innerHTML='<div class="dw"><span></span><span></span><span></span></div>';
+  msgs.appendChild(div);return div;
+}
+function insCode(code){
+  const d=code.replace(/\\n/g,'\n').replace(/\\t/g,'\t');
+  if(activeCellId){const cell=cells.find(c=>c.id===activeCellId);if(cell){cell.code=d;const ta=document.getElementById(`ta-${activeCellId}`);ta.value=d;ar(ta);showToast('コードを挿入しました');closeAI();return;}}
+  addCell(d);showToast('新しいセルに挿入しました');closeAI();
+}
+
+// ── UTILS ─────────────────────────────────────
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escA(s){return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\t/g,'\\t');}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+
+// ── INIT ──────────────────────────────────────
+renderAddBtn();
+createCell(`# PyPocket へようこそ！🐍
+# ブラウザ上でPythonが動きます
+
+import sys
+print(f"Python {sys.version}")
+print("Hello, PyPocket! 🎉")
+`);
+createCell(`# 計算の例
+nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+total = sum(nums)
+avg = total / len(nums)
+print(f"合計: {total}")
+print(f"平均: {avg}")
+`);
+renderTab('symbols');
+initPyodide();
+</script>
+</body>
+</html>
