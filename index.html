@@ -225,7 +225,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 <script>
 // ── STATE ─────────────────────────────────────
 let pyodide=null, cells=[], cellCtr=0, execOrder=0;
-let activeCellId=null, focusedTA=null;
+let activeCellId=null, focusedTA=null, _keepFocus=false;
 let aiConv=[], aiCtxCode='';
 let acResults=[], acIdx=-1, acTimer=null;
 let curTab='symbols';
@@ -240,7 +240,7 @@ const TABS = {
     {k:'->',t:'->'},{k:'=>',t:'=>'},{k:'**',t:'**'},{k:'//',t:'//'},
   ],
   ops:[
-    {k:'=',t:'='},{k:'==',t:'=='},{k:'!=',t:'!='},{k:'<=',t:'<='},{k:'>=',t:'>='},
+    {k:'=',t:'='},{k:'+',t:'+'},{k:'==',t:'=='},{k:'!=',t:'!='},{k:'<=',t:'<='},{k:'>=',t:'>='},
     {k:'<',t:'<'},{k:'>',t:'>'},
     {k:'and',t:' and ',cls:'lbl'},{k:'or',t:' or ',cls:'lbl'},{k:'not',t:'not ',cls:'lbl'},
     {k:'in',t:' in ',cls:'lbl'},{k:'is',t:' is ',cls:'lbl'},{k:'is not',t:' is not ',cls:'lbl'},
@@ -294,6 +294,7 @@ const AC_DATA = [
   {tr:'im',lb:'import モジュール',ins:'import ',c:7},
   {tr:'fr',lb:'from … import',ins:'from  import ',c:5},
   {tr:'pr',lb:'print()',ins:'print()',c:6},
+  {tr:'pri',lb:'print() — 確定入力',ins:'print()',c:6},
   {tr:'prf',lb:'print(f"...")',ins:'print(f"")',c:9},
   {tr:'ret',lb:'return 値',ins:'return ',c:7},
   {tr:'lam',lb:'lambda 式',ins:'lambda x: x',c:7},
@@ -367,12 +368,10 @@ function onFocus(id){
   renderTab(curTab);
 }
 function onBlur(){
-  setTimeout(()=>{
-    const ae=document.activeElement;
-    if(ae&&(ae.classList.contains('code-area')||ae.closest('#symBar')||ae.closest('#acPopup')))return;
-    document.getElementById('symBar').classList.remove('show');
-    closeAC();
-  },200);
+  // タップ先が記号バー・AC内ならフォーカスを戻すだけで閉じない
+  if(_keepFocus){_keepFocus=false;requestAnimationFrame(()=>{if(focusedTA)focusedTA.focus();});return;}
+  document.getElementById('symBar').classList.remove('show');
+  closeAC();
 }
 function onKD(e,id){
   const ta=e.target;
@@ -480,11 +479,11 @@ function triggerAC(ta){
     const s=ta.selectionStart,text=ta.value.slice(0,s);
     const word=text.match(/(\w+)$/)?.[1]||'';
     if(word.length<2){closeAC();return;}
-    const m=AC_DATA.filter(x=>x.tr.startsWith(word.toLowerCase())&&x.tr!==word.toLowerCase());
+    const m=AC_DATA.filter(x=>x.tr.startsWith(word.toLowerCase()));
     if(!m.length){closeAC();return;}
     acResults=m; acIdx=-1;
     posAC(ta);
-  },100);
+  },80);
 }
 function posAC(ta){
   const popup=document.getElementById('acPopup');
@@ -516,7 +515,11 @@ function applyAC(idx){
   showToast('✓ '+sn.lb);
 }
 function closeAC(){ acResults=[];acIdx=-1;document.getElementById('acPopup').classList.remove('open'); }
-document.addEventListener('touchstart',e=>{if(!e.target.closest('#acPopup')&&!e.target.closest('.code-area'))closeAC();},{passive:true});
+// 記号バー・AC内のタップでフォーカスを維持（DOM確定後に登録）
+document.addEventListener('pointerdown',e=>{
+  if(e.target.closest('#symBar')||e.target.closest('#acPopup')){_keepFocus=true;return;}
+  if(!e.target.closest('.code-area'))closeAC();
+},{passive:true});
 
 // ── EXECUTION ─────────────────────────────────
 async function runCell(id){
