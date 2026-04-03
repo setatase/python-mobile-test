@@ -58,7 +58,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .add-cell-btn:active { border-color: var(--accent); color: var(--accent); }
 
 /* ── SYMBOL BAR ── */
-.sym-bar { position: fixed; left: 0; right: 0; bottom: 68px; z-index: 150; background: rgba(11,13,20,0.98); backdrop-filter: blur(20px); border-top: 1px solid var(--border-hover); display: none; flex-direction: column; }
+.sym-bar { position: sticky; top: 0; left: 0; right: 0; z-index: 90; background: rgba(11,13,20,0.98); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border-hover); display: none; flex-direction: column; }
 .sym-bar.show { display: flex; }
 .sym-tabs { display: flex; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
 .sym-tabs::-webkit-scrollbar { display: none; }
@@ -158,8 +158,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <span class="runtime-version" id="runtimeVersion"></span>
 </div>
 
-<div class="notebook" id="notebook"></div>
-
 <!-- SYMBOL BAR -->
 <div class="sym-bar" id="symBar">
   <div class="sym-tabs">
@@ -171,6 +169,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   </div>
   <div class="sym-keys" id="symKeys"></div>
 </div>
+
+<div class="notebook" id="notebook"></div>
 
 <!-- AUTOCOMPLETE -->
 <div class="ac" id="acPopup"></div>
@@ -240,7 +240,7 @@ const TABS = {
     {k:'->',t:'->'},{k:'=>',t:'=>'},{k:'**',t:'**'},{k:'//',t:'//'},
   ],
   ops:[
-    {k:'==',t:'=='},{k:'!=',t:'!='},{k:'<=',t:'<='},{k:'>=',t:'>='},
+    {k:'=',t:'='},{k:'==',t:'=='},{k:'!=',t:'!='},{k:'<=',t:'<='},{k:'>=',t:'>='},
     {k:'<',t:'<'},{k:'>',t:'>'},
     {k:'and',t:' and ',cls:'lbl'},{k:'or',t:' or ',cls:'lbl'},{k:'not',t:'not ',cls:'lbl'},
     {k:'in',t:' in ',cls:'lbl'},{k:'is',t:' is ',cls:'lbl'},{k:'is not',t:' is not ',cls:'lbl'},
